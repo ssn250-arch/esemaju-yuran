@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/esemaju-yuran/static/css/main.e6c13ad2.css",
+    "main.js": "/esemaju-yuran/static/js/main.3d17565b.js",
+    "static/js/453.f154661d.chunk.js": "/esemaju-yuran/static/js/453.f154661d.chunk.js",
+    "index.html": "/esemaju-yuran/index.html",
+    "main.e6c13ad2.css.map": "/esemaju-yuran/static/css/main.e6c13ad2.css.map",
+    "main.3d17565b.js.map": "/esemaju-yuran/static/js/main.3d17565b.js.map",
+    "453.f154661d.chunk.js.map": "/esemaju-yuran/static/js/453.f154661d.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.e6c13ad2.css",
+    "static/js/main.3d17565b.js"
+  ]
+}
