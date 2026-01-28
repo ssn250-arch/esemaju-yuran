@@ -236,13 +236,13 @@ export default function App() {
                   <AlertCircle className="text-white w-5 h-5" />
                 </div>
                 <div className="text-left">
-                  <h2 className="text-slate-800 font-black text-sm uppercase tracking-wider">Senarai Belum Bayar Langsung</h2>
+                  <h2 className="text-slate-800 font-black text-sm uppercase tracking-wider">Senarai Ahli Warga Yang Belum Bayar</h2>
                   <p className="text-rose-500 text-[10px] font-bold uppercase tracking-widest mt-1">{defaulters.length} orang ahli</p>
                 </div>
               </div>
               <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-500 ${isDefaultersExpanded ? 'rotate-180' : ''}`} />
             </button>
-            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isDefaultersExpanded ? 'max-h-[800px] border-t border-rose-50' : 'max-h-0'}`}>
+            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isDefaultersExpanded ? 'max-h-[4000px] border-t border-rose-50' : 'max-h-0'}`}>
               <div className="p-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 bg-rose-50/20">
                 {defaulters.map(name => (
                   <div key={name} className="flex items-center gap-3 bg-white border border-rose-100 p-3 rounded-2xl shadow-sm">
