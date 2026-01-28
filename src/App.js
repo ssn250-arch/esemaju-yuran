@@ -197,7 +197,7 @@ export default function App() {
               <LayoutDashboard className="text-white w-5 h-5" />
             </div>
             <div>
-              <h1 className="font-black text-slate-800 text-sm md:text-base">Kelab Warga SMKA TJ</h1>
+              <h1 className="font-black text-slate-800 text-sm md:text-base">Kelab Warga SMKA Tun Juhar</h1>
               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 block">Sistem Pengurusan Yuran</span>
             </div>
           </div>
@@ -455,7 +455,7 @@ export default function App() {
       
       <footer className="max-w-7xl mx-auto px-4 mt-8 text-center">
         <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">
-          © 2026 Kelab Warga SMKA Tun Juhar • Lahad Datu, Sabah
+          © 2026 Kelab Warga SMKA Tun Juhar • Sandakan, Sabah
         </p>
       </footer>
     </div>
