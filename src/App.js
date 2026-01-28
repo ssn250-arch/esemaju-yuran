@@ -10,7 +10,6 @@ import {
 import { 
   getAuth, 
   signInAnonymously, 
-  signInWithCustomToken, 
   onAuthStateChanged 
 } from 'firebase/auth';
 import { 
@@ -31,7 +30,8 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-const myFirebaseConfig = {
+// 1. Konfigurasi Firebase Anda
+const firebaseConfig = {
   apiKey: "AIzaSyCzQyP7oZxKFjToYDktKtc2-8dbDGv9lkc",
   authDomain: "esemaju-yuran-bcfa0.firebaseapp.com",
   projectId: "esemaju-yuran-bcfa0",
@@ -40,15 +40,13 @@ const myFirebaseConfig = {
   appId: "1:919159059946:web:25f3ae6c79814e62eeae93"
 };
 
-const firebaseConfig = typeof __firebase_config !== 'undefined' 
-  ? JSON.parse(__firebase_config) 
-  : myFirebaseConfig;
-
+// 2. Inisialisasi Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'smka-tun-juhar-yuran-2026';
+const appId = 'smka-tun-juhar-yuran-2026';
 
+// 3. Senarai Nama Guru
 const TEACHER_NAMES = [
   "EN. MUHAMAD RAMLI BIN YAHYA", "PN. RAFINA BINTI OMAR", "PN. SAPURA BINTI ANJAW", "EN. MOHD SHARIFF BIN JUSOH",
   "PN. KAMISAH BINTI SALEHAN", "PN. FADZILAH BINTI JILANG", "EN. MOHAZLI BIN OKAR", "CIK NORLINDA BINTI AMIL",
@@ -94,11 +92,7 @@ export default function App() {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
+        await signInAnonymously(auth);
       } catch (e) { console.error(e); }
     };
     initAuth();
