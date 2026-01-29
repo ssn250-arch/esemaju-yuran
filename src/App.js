@@ -495,7 +495,7 @@ export default function App() {
                     <div className="bg-rose-500 p-3 rounded-2xl shadow-lg"><AlertCircle className="text-white w-5 h-5" /></div>
                     <div>
                       <h2 className="text-slate-800 font-black text-sm uppercase tracking-wider">Senarai Ahli Belum Bayar</h2>
-                      <p className="text-rose-500 text-[10px] font-bold uppercase tracking-widest mt-1">{defaulters.length} orang dikesan</p>
+                      <p className="text-rose-500 text-[10px] font-bold uppercase tracking-widest mt-1">{defaulters.length} orang </p>
                     </div>
                   </div>
                   <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-500 ${isDefaultersExpanded ? 'rotate-180' : ''}`} />
