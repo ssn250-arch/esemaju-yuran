@@ -20,17 +20,13 @@ import {
   Lock, 
   Unlock, 
   Users, 
-  DollarSign, 
-  Calendar,
   CheckCircle2,
   Loader2,
   Edit3,
   X,
   AlertCircle,
   ChevronDown,
-  UserX,
   LayoutDashboard,
-  ArrowRight,
   Trash2,
   Plus,
   Wallet,
@@ -107,7 +103,6 @@ export default function App() {
 
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [teacherToDelete, setTeacherToDelete] = useState(null);
-  const [transactionToEdit, setTransactionToEdit] = useState(null);
   const [transToDelete, setTransToDelete] = useState(null);
   const [nameToEdit, setNameToEdit] = useState(null);
   const [newNameInput, setNewNameInput] = useState("");
@@ -125,6 +120,11 @@ export default function App() {
   const [newTransNote, setNewTransNote] = useState("");
   const [newTransType, setNewTransType] = useState("IN"); 
   const [newTransDate, setNewTransDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // --- KEMASKINI NAMA TAB BROWSER ---
+  useEffect(() => {
+    document.title = "eWARGA SEMAJU";
+  }, []);
 
   // --- AUTH ---
   useEffect(() => {
@@ -146,7 +146,7 @@ export default function App() {
       const data = {};
       snapshot.forEach(doc => data[doc.id] = doc.data());
       setPayments(data);
-    });
+    }, (error) => console.error("Firestore Error:", error));
 
     const docRef = doc(db, 'artifacts', APP_ID_PATH, 'public', 'data', 'config', 'metadata');
     const unsubTeachers = onSnapshot(docRef, (docSnap) => {
@@ -156,7 +156,7 @@ export default function App() {
         setTeacherList(INITIAL_TEACHER_NAMES);
       }
       setLoading(false);
-    });
+    }, (error) => console.error("Firestore Error:", error));
 
     const qTrans = collection(db, 'artifacts', APP_ID_PATH, 'public', 'data', 'transactions');
     const unsubTrans = onSnapshot(qTrans, (snapshot) => {
@@ -164,7 +164,7 @@ export default function App() {
       snapshot.forEach(doc => trans.push({ id: doc.id, ...doc.data() }));
       trans.sort((a, b) => new Date(b.date) - new Date(a.date));
       setTransactions(trans);
-    });
+    }, (error) => console.error("Firestore Error:", error));
 
     return () => {
       unsubPayments();
@@ -194,7 +194,7 @@ export default function App() {
       return matchesSearch && matchesFilter;
     });
 
-    const total = teacherList.length || 1; // Elak pembahagian dengan sifar
+    const total = teacherList.length || 1; 
     const unpaidCount = total - paidCount;
 
     return { 
@@ -367,8 +367,8 @@ export default function App() {
               <LayoutDashboard className="text-white w-5 h-5" />
             </div>
             <div>
-              <h1 className="font-black text-slate-800 text-sm md:text-base uppercase tracking-tighter">Kelab Warga Tun Juhar</h1>
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Sistem Pengurusan Yuran 2026</span>
+              <h1 className="font-black text-slate-800 text-sm md:text-base uppercase tracking-tighter">Kelab Warga SMKA Tun Juhar</h1>
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Sistem Pengurusan Kewangan Kelab 2026</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -409,9 +409,7 @@ export default function App() {
         {(!isAdmin || activeTab === 'dashboard') && (
           <div className="animate-in fade-in zoom-in duration-300">
             
-            {/* Bahagian Carta & Statistik Utama */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-              {/* Carta Visual */}
               <div className="lg:col-span-2 bg-white rounded-[3rem] border border-slate-200 p-8 shadow-sm flex flex-col md:flex-row items-center gap-10">
                 <div className="relative w-48 h-48 flex-shrink-0">
                   <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
@@ -445,7 +443,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Baki Tunai Sampingan */}
               <div className="bg-indigo-600 rounded-[3rem] p-8 text-white shadow-xl shadow-indigo-200 flex flex-col justify-between overflow-hidden relative">
                 <div className="absolute top-0 right-0 p-8 opacity-10">
                   <Wallet className="w-32 h-32" />
@@ -468,7 +465,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Kad Ringkasan Kecil */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               <div className="p-6 rounded-[2rem] bg-white border border-slate-200 shadow-sm">
                 <Users className="w-5 h-5 text-indigo-600 mb-3" />
@@ -492,7 +488,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Senarai Belum Bayar */}
             {defaulters.length > 0 && (
               <div className="bg-white border border-rose-100 rounded-[2.5rem] overflow-hidden mb-8 shadow-sm">
                 <button onClick={() => setIsDefaultersExpanded(!isDefaultersExpanded)} className="w-full flex items-center justify-between p-6 hover:bg-rose-50/30 transition-colors">
@@ -518,7 +513,6 @@ export default function App() {
               </div>
             )}
 
-            {/* Carian & Filter */}
             <div className="flex flex-col lg:flex-row gap-4 mb-8">
               <div className="relative flex-1">
                 <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
@@ -539,7 +533,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Jadual Utama */}
             <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden">
               <div className="hidden lg:block">
                 <table className="w-full text-left">
@@ -584,7 +577,6 @@ export default function App() {
                 </table>
               </div>
 
-              {/* Mobile Card View */}
               <div className="lg:hidden divide-y divide-slate-100">
                 {filteredTeachers.map((name, idx) => {
                   const docId = name.replace(/[^a-zA-Z0-9]/g, '_');
@@ -697,7 +689,7 @@ export default function App() {
         )}
       </main>
 
-      {/* --- MODALS (Login, Edit Payment, Add Teacher, etc.) --- */}
+      {/* --- MODALS --- */}
       {showLoginModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-sm p-12 text-center">
