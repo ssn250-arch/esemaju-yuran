@@ -94,7 +94,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("Semua");
 
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
