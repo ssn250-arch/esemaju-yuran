@@ -187,8 +187,8 @@ export default function App() {
       const data = payments[docId] || { paidUntil: 0 };
       const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase());
       let matchesFilter = true;
-      if (filterStatus === 'paid') matchesFilter = data.paidUntil > 0;
-      if (filterStatus === 'unpaid') matchesFilter = data.paidUntil === 0;
+      if (filterStatus === 'Telah Bayar') matchesFilter = data.paidUntil > 0;
+      if (filterStatus === 'Belum Bayar') matchesFilter = data.paidUntil === 0;
       return matchesSearch && matchesFilter;
     });
 
