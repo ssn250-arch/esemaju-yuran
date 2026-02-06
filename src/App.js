@@ -518,9 +518,35 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
-        <Loader2 className="w-16 h-16 text-indigo-600 animate-spin" />
-        <p className="mt-6 text-slate-500 font-bold uppercase tracking-[0.2em] text-[10px]">Memuatkan Sistem Yuran...</p>
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center relative overflow-hidden">
+        {/* Background Ambience */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-200/30 rounded-full blur-[100px] animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-rose-200/30 rounded-full blur-[100px] animate-pulse delay-1000"></div>
+
+        <div className="relative z-10 flex flex-col items-center">
+          {/* Logo Animation */}
+          <div className="mb-10 relative">
+            <div className="absolute inset-0 bg-indigo-500/20 blur-xl rounded-full animate-ping duration-[2000ms]"></div>
+            <div className="bg-white p-6 rounded-[2rem] shadow-2xl border border-white/50 relative z-10">
+              <div className="bg-indigo-600 p-4 rounded-2xl shadow-inner">
+                <LayoutDashboard className="w-10 h-10 text-white animate-pulse" />
+              </div>
+            </div>
+          </div>
+
+          {/* Typography */}
+          <h2 className="text-3xl font-black text-slate-800 tracking-tighter mb-2">eWARGA</h2>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-8">Sistem Kewangan 2026</p>
+
+          {/* Custom Loader Indicators */}
+          <div className="flex items-center gap-3 bg-white/50 px-6 py-3 rounded-full border border-slate-100 backdrop-blur-sm">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
+            </span>
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Memuatkan Data...</span>
+          </div>
+        </div>
       </div>
     );
   }
