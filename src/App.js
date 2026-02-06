@@ -35,7 +35,9 @@ import {
   Save,
   AlertTriangle,
   Pencil,
-  PieChart as PieIcon
+  PieChart as PieIcon,
+  FileText,
+  Printer
 } from 'lucide-react';
 
 // --- KONFIGURASI FIREBASE ---
@@ -83,7 +85,8 @@ const FEE_RATE = 25;
 export default function App() {
   const [user, setUser] = useState(null);
   const [payments, setPayments] = useState({});
-  const [teacherList, setTeacherList] = useState([]);
+  // OPTIMASI: Inisialisasi teacherList terus dengan senarai asal supaya UI keluar cepat
+  const [teacherList, setTeacherList] = useState(INITIAL_TEACHER_NAMES);
   const [transactions, setTransactions] = useState([]);
   
   const [loading, setLoading] = useState(true);
@@ -134,7 +137,12 @@ export default function App() {
       } catch (e) { console.error("Auth Error:", e); }
     };
     initAuth();
-    return onAuthStateChanged(auth, setUser);
+    return onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      // OPTIMASI: Jika user dah sah, terus set loading false (tak perlu tunggu data penuh)
+      // Data akan masuk secara 'streaming' (real-time)
+      if (u) setLoading(false);
+    });
   }, []);
 
   // --- REAL-TIME DATA ---
@@ -152,10 +160,8 @@ export default function App() {
     const unsubTeachers = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists() && docSnap.data().teachers) {
         setTeacherList(docSnap.data().teachers);
-      } else {
-        setTeacherList(INITIAL_TEACHER_NAMES);
       }
-      setLoading(false);
+      // Kita tak perlu setTeacherList(INITIAL...) di sini lagi sebab dah set di useState awal
     }, (error) => console.error("Firestore Error:", error));
 
     const qTrans = collection(db, 'artifacts', APP_ID_PATH, 'public', 'data', 'transactions');
@@ -349,6 +355,167 @@ export default function App() {
     finally { setIsDeleting(false); }
   };
 
+  // --- PDF REPORT GENERATOR ---
+  const generatePDFReport = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert("Sila benarkan 'Pop-up' untuk memuat turun laporan.");
+      return;
+    }
+
+    const date = new Date().toLocaleDateString('ms-MY', { day: 'numeric', month: 'long', year: 'numeric' });
+    const time = new Date().toLocaleTimeString('ms-MY');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Laporan Kewangan eWARGA - ${date}</title>
+        <style>
+          @page { size: A4; margin: 2cm; }
+          body { font-family: 'Arial', sans-serif; font-size: 10pt; line-height: 1.4; color: #111; max-width: 210mm; margin: 0 auto; }
+          .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 30px; }
+          .logo { font-size: 24px; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; }
+          .sub-logo { font-size: 12px; font-weight: bold; letter-spacing: 2px; color: #555; text-transform: uppercase; }
+          .meta { margin-top: 10px; font-size: 10px; color: #666; }
+          
+          .summary-box { display: flex; justify-content: space-between; background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 30px; border: 1px solid #ddd; }
+          .summary-item { text-align: center; }
+          .summary-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #666; display: block; margin-bottom: 5px; }
+          .summary-value { font-size: 14px; font-weight: bold; }
+
+          .section-title { font-size: 12px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 5px; margin: 30px 0 15px 0; }
+          
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9pt; }
+          th, td { padding: 8px 10px; border-bottom: 1px solid #eee; text-align: left; }
+          th { background-color: #f1f1f1; font-weight: bold; font-size: 8pt; text-transform: uppercase; }
+          tr:nth-child(even) { background-color: #fafafa; }
+          
+          .status-paid { color: #059669; font-weight: bold; }
+          .status-unpaid { color: #dc2626; font-weight: bold; }
+          .money-in { color: #059669; }
+          .money-out { color: #dc2626; }
+          .text-right { text-align: right; }
+          
+          .footer { margin-top: 50px; text-align: center; font-size: 8pt; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+          
+          @media print {
+            body { -webkit-print-color-adjust: exact; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="logo">Kelab Warga SMKA Tun Juhar</div>
+          <div class="sub-logo">Laporan Kewangan & Keahlian 2026</div>
+          <div class="meta">Dijana pada: ${date}, ${time}</div>
+        </div>
+
+        <div class="summary-box">
+          <div class="summary-item">
+            <span class="summary-label">Kutipan Yuran</span>
+            <span class="summary-value">RM ${totalFeesCollected.toFixed(2)}</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Aliran Masuk</span>
+            <span class="summary-value text-green">RM ${financialStats.totalIn.toFixed(2)}</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Aliran Keluar</span>
+            <span class="summary-value text-red">RM ${financialStats.totalOut.toFixed(2)}</span>
+          </div>
+          <div class="summary-item" style="border-left: 1px solid #ddd; padding-left: 20px;">
+            <span class="summary-label">Baki Tunai</span>
+            <span class="summary-value">RM ${financialStats.currentBalance.toFixed(2)}</span>
+          </div>
+        </div>
+
+        <div class="section-title">Ringkasan Keahlian</div>
+        <table>
+          <thead>
+            <tr>
+              <th width="50%">Statistik</th>
+              <th width="50%" class="text-right">Nilai</th>
+            </tr>
+          </thead>
+          <tbody>
+             <tr><td>Jumlah Ahli</td><td class="text-right">${stats.total}</td></tr>
+             <tr><td>Selesai Bayar</td><td class="text-right status-paid">${stats.paidCount}</td></tr>
+             <tr><td>Belum Selesai</td><td class="text-right status-unpaid">${stats.unpaidCount}</td></tr>
+          </tbody>
+        </table>
+
+        <div class="section-title">Senarai Pembayaran Ahli</div>
+        <table>
+          <thead>
+            <tr>
+              <th width="5%">No.</th>
+              <th width="50%">Nama Ahli</th>
+              <th width="25%">Status</th>
+              <th width="20%" class="text-right">Jumlah (RM)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${teacherList.map((name, i) => {
+              const docId = name.replace(/[^a-zA-Z0-9]/g, '_');
+              const data = payments[docId] || { paidUntil: 0, totalAmount: 0 };
+              const status = data.paidUntil > 0 
+                ? `<span class="status-paid">SEHINGGA ${MONTHS[data.paidUntil].toUpperCase()}</span>` 
+                : `<span class="status-unpaid">BELUM BAYAR</span>`;
+              return `
+                <tr>
+                  <td>${i + 1}.</td>
+                  <td>${name}</td>
+                  <td>${status}</td>
+                  <td class="text-right">${(data.totalAmount || 0).toFixed(2)}</td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+
+        <div class="section-title" style="page-break-before: always;">Rekod Transaksi Tunai (Lain-lain)</div>
+        <table>
+          <thead>
+            <tr>
+              <th width="20%">Tarikh</th>
+              <th width="50%">Butiran</th>
+              <th width="15%" class="text-right">Masuk</th>
+              <th width="15%" class="text-right">Keluar</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${transactions.length > 0 ? transactions.map(t => {
+              const amount = parseFloat(t.amount).toFixed(2);
+              return `
+                <tr>
+                  <td>${t.date}</td>
+                  <td>${t.note}</td>
+                  <td class="text-right ${t.type === 'IN' ? 'money-in' : ''}">${t.type === 'IN' ? amount : '-'}</td>
+                  <td class="text-right ${t.type === 'OUT' ? 'money-out' : ''}">${t.type === 'OUT' ? amount : '-'}</td>
+                </tr>`;
+            }).join('') : '<tr><td colspan="4" style="text-align:center; color:#999;">Tiada rekod transaksi tambahan</td></tr>'}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          Laporan ini dijana secara automatik oleh Sistem eWARGA SEMAJU. <br/>
+          Sila simpan dokumen ini sebagai rujukan.
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.focus();
+    
+    // Tunggu imej/style load (sedikit delay)
+    setTimeout(() => {
+      printWindow.print();
+      // printWindow.close(); // Optional: tutup lepas print jika mahu
+    }, 500);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
@@ -409,6 +576,17 @@ export default function App() {
         {(!isAdmin || activeTab === 'dashboard') && (
           <div className="animate-in fade-in zoom-in duration-300">
             
+            {isAdmin && (
+              <div className="flex justify-end mb-6">
+                <button 
+                  onClick={generatePDFReport}
+                  className="bg-slate-800 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-slate-700 transition-all flex items-center gap-2"
+                >
+                  <Printer className="w-4 h-4" /> Muat Turun Laporan (PDF)
+                </button>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
               <div className="lg:col-span-2 bg-white rounded-[3rem] border border-slate-200 p-8 shadow-sm flex flex-col md:flex-row items-center gap-10">
                 <div className="relative w-48 h-48 flex-shrink-0">
@@ -628,9 +806,14 @@ export default function App() {
             <div className="bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-sm">
               <div className="p-8 flex justify-between items-center border-b border-slate-100">
                 <h3 className="text-lg font-black text-slate-800 uppercase tracking-widest">Sejarah Transaksi</h3>
-                <button onClick={() => setShowTransactionModal(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-2">
-                  <Plus className="w-4 h-4" /> Rekod Baru
-                </button>
+                <div className="flex gap-2">
+                   <button onClick={generatePDFReport} className="bg-slate-100 text-slate-600 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm flex items-center gap-2 hover:bg-slate-200">
+                    <Printer className="w-4 h-4" /> PDF
+                  </button>
+                  <button onClick={() => setShowTransactionModal(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-2">
+                    <Plus className="w-4 h-4" /> Rekod Baru
+                  </button>
+                </div>
               </div>
               <div className="divide-y divide-slate-100">
                 {transactions.length === 0 ? (
@@ -787,7 +970,10 @@ export default function App() {
               type="text" placeholder="NAMA PENUH" value={newTeacherName} onChange={(e) => setNewTeacherName(e.target.value.toUpperCase())}
               className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl mb-8 font-black text-sm"
             />
-            <button onClick={handleAddTeacher} disabled={isSaving} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-[10px] shadow-lg">TAMBAH</button>
+            <div className="flex gap-3">
+               <button onClick={() => setShowAddTeacherModal(false)} className="flex-1 py-4 font-black uppercase text-[10px] text-slate-500 hover:bg-slate-50 rounded-2xl">BATAL</button>
+               <button onClick={handleAddTeacher} disabled={isSaving} className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black text-[10px] shadow-lg">TAMBAH</button>
+            </div>
           </div>
         </div>
       )}
@@ -809,12 +995,19 @@ export default function App() {
       {showEditNameModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-[2.5rem] p-10 w-full max-w-sm">
-            <h2 className="font-black uppercase text-[10px] mb-8 tracking-widest">Kemas Nama Ahli</h2>
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="font-black uppercase text-[10px] tracking-widest">Kemas Nama Ahli</h2>
+              <button onClick={() => setShowEditNameModal(false)}><X className="w-5 h-5 text-slate-400" /></button>
+            </div>
+            
             <input 
               type="text" value={newNameInput} onChange={(e) => setNewNameInput(e.target.value.toUpperCase())}
               className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl mb-8 font-black text-sm"
             />
-            <button onClick={handleUpdateName} disabled={isSaving} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-[10px] shadow-lg">KEMASKINI</button>
+            <div className="flex gap-3">
+              <button onClick={() => setShowEditNameModal(false)} className="flex-1 py-4 font-black uppercase text-[10px] text-slate-500 hover:bg-slate-50 rounded-2xl">BATAL</button>
+              <button onClick={handleUpdateName} disabled={isSaving} className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black text-[10px] shadow-lg">KEMASKINI</button>
+            </div>
           </div>
         </div>
       )}
