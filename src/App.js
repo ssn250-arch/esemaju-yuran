@@ -37,7 +37,9 @@ import {
   Pencil,
   PieChart as PieIcon,
   FileText,
-  Printer
+  Printer,
+  Award,
+  Target
 } from 'lucide-react';
 
 // --- KONFIGURASI FIREBASE ---
@@ -181,13 +183,19 @@ export default function App() {
 
   // --- LOGIK PENGIRAAN ---
   const { filteredTeachers, defaulters, stats } = useMemo(() => {
-    let paidCount = 0;
+    let paidCount = 0;       // Bayar > 0
+    let paidTenCount = 0;    // Bayar >= 10 (Oktober)
+    let paidFullCount = 0;   // Bayar == 12 (Penuh)
     
     const allDefaulters = teacherList.filter(name => {
       const docId = name.replace(/[^a-zA-Z0-9]/g, '_');
-      const isPaid = (payments[docId]?.paidUntil || 0) > 0;
-      if (isPaid) paidCount++;
-      return !isPaid;
+      const paidVal = payments[docId]?.paidUntil || 0;
+      
+      if (paidVal > 0) paidCount++;
+      if (paidVal >= 10) paidTenCount++;
+      if (paidVal === 12) paidFullCount++;
+
+      return paidVal === 0;
     });
 
     const filtered = teacherList.filter(name => {
@@ -210,8 +218,10 @@ export default function App() {
         total,
         paidCount,
         unpaidCount,
-        paidPercent: (paidCount / total) * 100,
-        unpaidPercent: (unpaidCount / total) * 100
+        paidTenCount,
+        paidFullCount,
+        paidTenPercent: (paidTenCount / total) * 100,
+        paidFullPercent: (paidFullCount / total) * 100
       }
     };
   }, [searchQuery, filterStatus, payments, teacherList]);
@@ -440,7 +450,8 @@ export default function App() {
           </thead>
           <tbody>
              <tr><td>Jumlah Ahli</td><td class="text-right">${stats.total}</td></tr>
-             <tr><td>Selesai Bayar</td><td class="text-right status-paid">${stats.paidCount}</td></tr>
+             <tr><td>Selesai Bayar (Penuh)</td><td class="text-right status-paid">${stats.paidFullCount}</td></tr>
+             <tr><td>Bayar Sehingga Okt</td><td class="text-right status-paid">${stats.paidTenCount}</td></tr>
              <tr><td>Belum Selesai</td><td class="text-right status-unpaid">${stats.unpaidCount}</td></tr>
           </tbody>
         </table>
@@ -614,21 +625,45 @@ export default function App() {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-              <div className="lg:col-span-2 bg-white rounded-[3rem] border border-slate-200 p-8 shadow-sm flex flex-col md:flex-row items-center gap-10">
-                <div className="relative w-48 h-48 flex-shrink-0">
-                  <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-                    <circle cx="18" cy="18" r="16" fill="none" className="stroke-slate-100" strokeWidth="4" />
-                    <circle 
-                      cx="18" cy="18" r="16" fill="none" className="stroke-indigo-600" strokeWidth="4" 
-                      strokeDasharray={`${stats.paidPercent} 100`} 
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-3xl font-black text-slate-800">{Math.round(stats.paidPercent)}%</span>
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Selesai</span>
+              <div className="lg:col-span-2 bg-white rounded-[3rem] border border-slate-200 p-8 shadow-sm flex flex-col items-center xl:flex-row gap-8">
+                
+                {/* DUAL CIRCLE CHARTS SECTION */}
+                <div className="flex flex-col sm:flex-row gap-6 items-center justify-center flex-shrink-0">
+                  {/* Chart 1: Bayar Penuh (Bulan 12) */}
+                   <div className="relative w-36 h-36 flex-shrink-0">
+                    <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                      <circle cx="18" cy="18" r="16" fill="none" className="stroke-slate-100" strokeWidth="3" />
+                      <circle 
+                        cx="18" cy="18" r="16" fill="none" className="stroke-indigo-600" strokeWidth="3" 
+                        strokeDasharray={`${stats.paidFullPercent} 100`} 
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <Award className="w-5 h-5 text-indigo-600 mb-1" />
+                      <span className="text-xl font-black text-slate-800">{Math.round(stats.paidFullPercent)}%</span>
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Penuh</span>
+                    </div>
+                  </div>
+
+                  {/* Chart 2: Bayar Sehingga Bulan 10 */}
+                  <div className="relative w-36 h-36 flex-shrink-0">
+                    <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                      <circle cx="18" cy="18" r="16" fill="none" className="stroke-slate-100" strokeWidth="3" />
+                      <circle 
+                        cx="18" cy="18" r="16" fill="none" className="stroke-emerald-500" strokeWidth="3" 
+                        strokeDasharray={`${stats.paidTenPercent} 100`} 
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <Target className="w-5 h-5 text-emerald-500 mb-1" />
+                      <span className="text-xl font-black text-slate-800">{Math.round(stats.paidTenPercent)}%</span>
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Hingga Okt</span>
+                    </div>
                   </div>
                 </div>
+
                 <div className="flex-1 w-full">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="bg-indigo-50 p-3 rounded-2xl"><PieIcon className="w-5 h-5 text-indigo-600" /></div>
@@ -638,10 +673,12 @@ export default function App() {
                     <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
                       <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">Sudah Bayar</p>
                       <div className="text-2xl font-black text-indigo-700">{stats.paidCount} <span className="text-xs opacity-60">orang</span></div>
+                      <div className="mt-1 text-[9px] text-indigo-400 font-medium leading-tight">Sekurang-kurangnya 1 bulan</div>
                     </div>
                     <div className="p-4 bg-rose-50/50 rounded-2xl border border-rose-100">
                       <p className="text-[9px] font-black text-rose-400 uppercase tracking-widest mb-1">Belum Bayar</p>
                       <div className="text-2xl font-black text-rose-700">{stats.unpaidCount} <span className="text-xs opacity-60">orang</span></div>
+                       <div className="mt-1 text-[9px] text-rose-400 font-medium leading-tight">Tiada rekod bayaran</div>
                     </div>
                   </div>
                 </div>
