@@ -682,15 +682,15 @@ export default function App() {
                   <div className="flex items-center gap-4 text-left">
                     <div className="bg-rose-500 p-3 rounded-2xl shadow-lg"><AlertCircle className="text-white w-5 h-5" /></div>
                     <div>
-                      <h2 className="text-slate-800 font-black text-sm uppercase tracking-wider">Senarai Ahli Belum Selesai</h2>
+                      <h2 className="text-slate-800 font-black text-sm uppercase tracking-wider">Senarai Ahli Warga Yang Belum Selesai Bayaran Yuran</h2>
                       <p className="text-rose-500 text-[10px] font-bold uppercase tracking-widest mt-1">
-                        {defaulters.length} orang ({zeroPayers.length} Orang Belum Bayar, {partialPayers.length} Orang Bayaran Belum Penuh)
+                        {defaulters.length} orang ({zeroPayers.length} Tiada Rekod Bayaran, {partialPayers.length} Telah Mula Membuat Bayaran)
                       </p>
                     </div>
                   </div>
                   <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-500 ${isDefaultersExpanded ? 'rotate-180' : ''}`} />
                 </button>
-                <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isDefaultersExpanded ? 'max-h-[4000px] border-t border-rose-50' : 'max-h-0'}`}>
+                <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isDefaultersExpanded ? 'max-h-[20000px] border-t border-rose-50' : 'max-h-0'}`}>
                   
                   {/* BAHAGIAN 1: TIADA REKOD BAYARAN */}
                   {zeroPayers.length > 0 && (
@@ -710,12 +710,12 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* BAHAGIAN 2: BAYARAN TELAH DIBUAT TETAPI BELUM SELESAI */}
+                  {/* BAHAGIAN 2: BAYARAN SEPARA */}
                   {partialPayers.length > 0 && (
                     <div className="px-8 pt-4 pb-8">
                        <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
                           <span className="w-2 h-2 rounded-full bg-orange-400"></span>
-                          Bayaran Telah Dibuat Tetapi Belum Selesai ({partialPayers.length})
+                          Bayaran Separa ({partialPayers.length})
                        </h3>
                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                           {partialPayers.map(name => {
