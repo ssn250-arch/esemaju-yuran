@@ -37,9 +37,7 @@ import {
   Pencil,
   PieChart as PieIcon,
   FileText,
-  Printer,
-  Award,
-  Target
+  Printer
 } from 'lucide-react';
 
 // --- KONFIGURASI FIREBASE ---
@@ -81,13 +79,14 @@ const INITIAL_TEACHER_NAMES = [
   "EN. MUHAMAD HAZIQ BIN MUHAMAD AZHAN", "PN. NORKISAH BINTI MUNIH"
 ];
 
-const MONTHS = ["Tiada", "Januari", "Februari", "Mac", "April", "Mei", "Jun", "Julai", "Ogos", "September", "Oktober", "November", "Disember"];
+// HAD: Tempoh bayaran yuran dihadkan sehingga OKTOBER sahaja (10 BULAN)
+const MONTHS = ["Tiada", "Januari", "Februari", "Mac", "April", "Mei", "Jun", "Julai", "Ogos", "September", "Oktober"];
+const MAX_PAYMENT_MONTH = 10;
 const FEE_RATE = 25;
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [payments, setPayments] = useState({});
-  // OPTIMASI: Inisialisasi teacherList terus dengan senarai asal supaya UI keluar cepat
   const [teacherList, setTeacherList] = useState(INITIAL_TEACHER_NAMES);
   const [transactions, setTransactions] = useState([]);
   
@@ -126,12 +125,10 @@ export default function App() {
   const [newTransType, setNewTransType] = useState("IN"); 
   const [newTransDate, setNewTransDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // --- KEMASKINI NAMA TAB BROWSER ---
   useEffect(() => {
     document.title = "eWARGA SEMAJU";
   }, []);
 
-  // --- AUTH ---
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -141,13 +138,10 @@ export default function App() {
     initAuth();
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
-      // OPTIMASI: Jika user dah sah, terus set loading false (tak perlu tunggu data penuh)
-      // Data akan masuk secara 'streaming' (real-time)
       if (u) setLoading(false);
     });
   }, []);
 
-  // --- REAL-TIME DATA ---
   useEffect(() => {
     if (!user) return;
 
@@ -163,7 +157,6 @@ export default function App() {
       if (docSnap.exists() && docSnap.data().teachers) {
         setTeacherList(docSnap.data().teachers);
       }
-      // Kita tak perlu setTeacherList(INITIAL...) di sini lagi sebab dah set di useState awal
     }, (error) => console.error("Firestore Error:", error));
 
     const qTrans = collection(db, 'artifacts', APP_ID_PATH, 'public', 'data', 'transactions');
@@ -182,46 +175,57 @@ export default function App() {
   }, [user]);
 
   // --- LOGIK PENGIRAAN ---
-  const { filteredTeachers, defaulters, stats } = useMemo(() => {
-    let paidCount = 0;       // Bayar > 0
-    let paidTenCount = 0;    // Bayar >= 10 (Oktober)
-    let paidFullCount = 0;   // Bayar == 12 (Penuh)
+  const { filteredTeachers, defaulters, zeroPayers, partialPayers, stats } = useMemo(() => {
+    let fullPaidCount = 0;
+    const zeroList = [];
+    const partialList = [];
     
-    const allDefaulters = teacherList.filter(name => {
+    // Asingkan Zero Payers dan Partial Payers
+    teacherList.forEach(name => {
       const docId = name.replace(/[^a-zA-Z0-9]/g, '_');
-      const paidVal = payments[docId]?.paidUntil || 0;
+      const paidMonth = payments[docId]?.paidUntil || 0;
+      const isFull = paidMonth === MAX_PAYMENT_MONTH;
       
-      if (paidVal > 0) paidCount++;
-      if (paidVal >= 10) paidTenCount++;
-      if (paidVal === 12) paidFullCount++;
-
-      return paidVal === 0;
+      if (isFull) {
+        fullPaidCount++;
+      } else {
+        if (paidMonth === 0) {
+          zeroList.push(name);
+        } else {
+          partialList.push(name);
+        }
+      }
     });
+
+    // Gabung untuk senarai defaulters umum jika perlu
+    const allDefaulters = [...zeroList, ...partialList];
 
     const filtered = teacherList.filter(name => {
       const docId = name.replace(/[^a-zA-Z0-9]/g, '_');
       const data = payments[docId] || { paidUntil: 0 };
       const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase());
+      
       let matchesFilter = true;
-      if (filterStatus === 'Telah Bayar') matchesFilter = data.paidUntil > 0;
-      if (filterStatus === 'Belum Bayar') matchesFilter = data.paidUntil === 0;
+      if (filterStatus === 'Selesai Bayar') matchesFilter = data.paidUntil === MAX_PAYMENT_MONTH;
+      if (filterStatus === 'Belum Selesai') matchesFilter = data.paidUntil < MAX_PAYMENT_MONTH;
+      
       return matchesSearch && matchesFilter;
     });
 
     const total = teacherList.length || 1; 
-    const unpaidCount = total - paidCount;
+    const notFullCount = total - fullPaidCount;
 
     return { 
       filteredTeachers: filtered, 
       defaulters: allDefaulters,
+      zeroPayers: zeroList,
+      partialPayers: partialList,
       stats: {
         total,
-        paidCount,
-        unpaidCount,
-        paidTenCount,
-        paidFullCount,
-        paidTenPercent: (paidTenCount / total) * 100,
-        paidFullPercent: (paidFullCount / total) * 100
+        paidCount: fullPaidCount,
+        unpaidCount: notFullCount,
+        paidPercent: (fullPaidCount / total) * 100, 
+        unpaidPercent: (notFullCount / total) * 100
       }
     };
   }, [searchQuery, filterStatus, payments, teacherList]);
@@ -238,7 +242,6 @@ export default function App() {
   }, [transactions, totalFeesCollected]);
 
 
-  // --- HANDLERS ---
   const handleAdminLogin = (e) => {
     e.preventDefault();
     if (password === "abc@12345") {
@@ -256,7 +259,7 @@ export default function App() {
     const docId = name.replace(/[^a-zA-Z0-9]/g, '_');
     const data = payments[docId] || { paidUntil: 0, lastDate: "" };
     setSelectedTeacher(name);
-    setEditMonth(data.paidUntil || 0);
+    setEditMonth(Math.min(data.paidUntil || 0, MAX_PAYMENT_MONTH));
     setEditDate(data.lastDate || new Date().toISOString().split('T')[0]);
     setShowEditModal(true);
   };
@@ -365,7 +368,6 @@ export default function App() {
     finally { setIsDeleting(false); }
   };
 
-  // --- PDF REPORT GENERATOR ---
   const generatePDFReport = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -450,9 +452,8 @@ export default function App() {
           </thead>
           <tbody>
              <tr><td>Jumlah Ahli</td><td class="text-right">${stats.total}</td></tr>
-             <tr><td>Selesai Bayar (Penuh)</td><td class="text-right status-paid">${stats.paidFullCount}</td></tr>
-             <tr><td>Bayar Sehingga Okt</td><td class="text-right status-paid">${stats.paidTenCount}</td></tr>
-             <tr><td>Belum Selesai</td><td class="text-right status-unpaid">${stats.unpaidCount}</td></tr>
+             <tr><td>Selesai Bayar Penuh</td><td class="text-right status-paid">${stats.paidCount}</td></tr>
+             <tr><td>Belum Selesai Penuh</td><td class="text-right status-unpaid">${stats.unpaidCount}</td></tr>
           </tbody>
         </table>
 
@@ -470,9 +471,10 @@ export default function App() {
             ${teacherList.map((name, i) => {
               const docId = name.replace(/[^a-zA-Z0-9]/g, '_');
               const data = payments[docId] || { paidUntil: 0, totalAmount: 0 };
-              const status = data.paidUntil > 0 
-                ? `<span class="status-paid">SEHINGGA ${MONTHS[data.paidUntil].toUpperCase()}</span>` 
-                : `<span class="status-unpaid">BELUM BAYAR</span>`;
+              const isFull = data.paidUntil === MAX_PAYMENT_MONTH;
+              const status = isFull 
+                ? `<span class="status-paid">SELESAI BAYARAN (PENUH)</span>` 
+                : `<span class="status-unpaid">SEHINGGA ${data.paidUntil > 0 ? MONTHS[data.paidUntil].toUpperCase() : 'TIADA'}</span>`;
               return `
                 <tr>
                   <td>${i + 1}.</td>
@@ -520,22 +522,18 @@ export default function App() {
     printWindow.document.close();
     printWindow.focus();
     
-    // Tunggu imej/style load (sedikit delay)
     setTimeout(() => {
       printWindow.print();
-      // printWindow.close(); // Optional: tutup lepas print jika mahu
     }, 500);
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center relative overflow-hidden">
-        {/* Background Ambience */}
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-200/30 rounded-full blur-[100px] animate-pulse"></div>
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-rose-200/30 rounded-full blur-[100px] animate-pulse delay-1000"></div>
 
         <div className="relative z-10 flex flex-col items-center">
-          {/* Logo Animation */}
           <div className="mb-10 relative">
             <div className="absolute inset-0 bg-indigo-500/20 blur-xl rounded-full animate-ping duration-[2000ms]"></div>
             <div className="bg-white p-6 rounded-[2rem] shadow-2xl border border-white/50 relative z-10">
@@ -545,11 +543,9 @@ export default function App() {
             </div>
           </div>
 
-          {/* Typography */}
           <h2 className="text-3xl font-black text-slate-800 tracking-tighter mb-2">eWARGA</h2>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-8">Sistem Kewangan 2026</p>
 
-          {/* Custom Loader Indicators */}
           <div className="flex items-center gap-3 bg-white/50 px-6 py-3 rounded-full border border-slate-100 backdrop-blur-sm">
             <span className="relative flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
@@ -625,45 +621,21 @@ export default function App() {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-              <div className="lg:col-span-2 bg-white rounded-[3rem] border border-slate-200 p-8 shadow-sm flex flex-col items-center xl:flex-row gap-8">
-                
-                {/* DUAL CIRCLE CHARTS SECTION */}
-                <div className="flex flex-col sm:flex-row gap-6 items-center justify-center flex-shrink-0">
-                  {/* Chart 1: Bayar Penuh (Bulan 12) */}
-                   <div className="relative w-36 h-36 flex-shrink-0">
-                    <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-                      <circle cx="18" cy="18" r="16" fill="none" className="stroke-slate-100" strokeWidth="3" />
-                      <circle 
-                        cx="18" cy="18" r="16" fill="none" className="stroke-indigo-600" strokeWidth="3" 
-                        strokeDasharray={`${stats.paidFullPercent} 100`} 
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <Award className="w-5 h-5 text-indigo-600 mb-1" />
-                      <span className="text-xl font-black text-slate-800">{Math.round(stats.paidFullPercent)}%</span>
-                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Penuh</span>
-                    </div>
-                  </div>
-
-                  {/* Chart 2: Bayar Sehingga Bulan 10 */}
-                  <div className="relative w-36 h-36 flex-shrink-0">
-                    <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-                      <circle cx="18" cy="18" r="16" fill="none" className="stroke-slate-100" strokeWidth="3" />
-                      <circle 
-                        cx="18" cy="18" r="16" fill="none" className="stroke-emerald-500" strokeWidth="3" 
-                        strokeDasharray={`${stats.paidTenPercent} 100`} 
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <Target className="w-5 h-5 text-emerald-500 mb-1" />
-                      <span className="text-xl font-black text-slate-800">{Math.round(stats.paidTenPercent)}%</span>
-                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Hingga Okt</span>
-                    </div>
+              <div className="lg:col-span-2 bg-white rounded-[3rem] border border-slate-200 p-8 shadow-sm flex flex-col md:flex-row items-center gap-10">
+                <div className="relative w-48 h-48 flex-shrink-0">
+                  <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                    <circle cx="18" cy="18" r="16" fill="none" className="stroke-slate-100" strokeWidth="4" />
+                    <circle 
+                      cx="18" cy="18" r="16" fill="none" className="stroke-indigo-600" strokeWidth="4" 
+                      strokeDasharray={`${stats.paidPercent} 100`} 
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-3xl font-black text-slate-800">{Math.round(stats.paidPercent)}%</span>
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Bayaran Penuh</span>
                   </div>
                 </div>
-
                 <div className="flex-1 w-full">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="bg-indigo-50 p-3 rounded-2xl"><PieIcon className="w-5 h-5 text-indigo-600" /></div>
@@ -671,14 +643,12 @@ export default function App() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
-                      <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">Sudah Bayar</p>
+                      <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">Bayaran Penuh</p>
                       <div className="text-2xl font-black text-indigo-700">{stats.paidCount} <span className="text-xs opacity-60">orang</span></div>
-                      <div className="mt-1 text-[9px] text-indigo-400 font-medium leading-tight">Sekurang-kurangnya 1 bulan</div>
                     </div>
                     <div className="p-4 bg-rose-50/50 rounded-2xl border border-rose-100">
-                      <p className="text-[9px] font-black text-rose-400 uppercase tracking-widest mb-1">Belum Bayar</p>
+                      <p className="text-[9px] font-black text-rose-400 uppercase tracking-widest mb-1">Belum Selesai</p>
                       <div className="text-2xl font-black text-rose-700">{stats.unpaidCount} <span className="text-xs opacity-60">orang</span></div>
-                       <div className="mt-1 text-[9px] text-rose-400 font-medium leading-tight">Tiada rekod bayaran</div>
                     </div>
                   </div>
                 </div>
@@ -706,50 +676,61 @@ export default function App() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <div className="p-6 rounded-[2rem] bg-white border border-slate-200 shadow-sm">
-                <Users className="w-5 h-5 text-indigo-600 mb-3" />
-                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Jumlah Ahli</p>
-                <div className="text-2xl font-black tracking-tighter">{teacherList.length}</div>
-              </div>
-              <div className="p-6 rounded-[2rem] bg-white border border-slate-200 shadow-sm">
-                <ArrowDownLeft className="w-5 h-5 text-emerald-600 mb-3" />
-                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Aliran Masuk</p>
-                <div className="text-2xl font-black tracking-tighter text-emerald-600">RM {(totalFeesCollected + financialStats.totalIn).toFixed(2)}</div>
-              </div>
-              <div className="p-6 rounded-[2rem] bg-white border border-slate-200 shadow-sm">
-                <ArrowUpRight className="w-5 h-5 text-rose-600 mb-3" />
-                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Aliran Keluar</p>
-                <div className="text-2xl font-black tracking-tighter text-rose-600">RM {financialStats.totalOut.toFixed(2)}</div>
-              </div>
-               <div className="p-6 rounded-[2rem] bg-white border border-slate-200 shadow-sm">
-                <CheckCircle2 className="w-5 h-5 text-indigo-600 mb-3" />
-                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Tahun Pengurusan</p>
-                <div className="text-2xl font-black tracking-tighter">2026</div>
-              </div>
-            </div>
-
             {defaulters.length > 0 && (
               <div className="bg-white border border-rose-100 rounded-[2.5rem] overflow-hidden mb-8 shadow-sm">
                 <button onClick={() => setIsDefaultersExpanded(!isDefaultersExpanded)} className="w-full flex items-center justify-between p-6 hover:bg-rose-50/30 transition-colors">
                   <div className="flex items-center gap-4 text-left">
                     <div className="bg-rose-500 p-3 rounded-2xl shadow-lg"><AlertCircle className="text-white w-5 h-5" /></div>
                     <div>
-                      <h2 className="text-slate-800 font-black text-sm uppercase tracking-wider">Senarai Ahli Belum Bayar</h2>
-                      <p className="text-rose-500 text-[10px] font-bold uppercase tracking-widest mt-1">{defaulters.length} orang </p>
+                      <h2 className="text-slate-800 font-black text-sm uppercase tracking-wider">Senarai Ahli Belum Selesai</h2>
+                      <p className="text-rose-500 text-[10px] font-bold uppercase tracking-widest mt-1">
+                        {defaulters.length} orang ({zeroPayers.length} Orang Belum Bayar, {partialPayers.length} Orang Bayaran Belum Penuh)
+                      </p>
                     </div>
                   </div>
                   <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-500 ${isDefaultersExpanded ? 'rotate-180' : ''}`} />
                 </button>
                 <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isDefaultersExpanded ? 'max-h-[4000px] border-t border-rose-50' : 'max-h-0'}`}>
-                  <div className="p-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 bg-rose-50/20">
-                    {defaulters.map(name => (
-                      <div key={name} className="flex items-center gap-3 bg-white border border-rose-100 p-3 rounded-2xl">
-                        <div className="w-2 h-2 rounded-full bg-rose-500"></div>
-                        <span className="text-[11px] font-bold text-rose-900 uppercase truncate">{name}</span>
-                      </div>
-                    ))}
-                  </div>
+                  
+                  {/* BAHAGIAN 1: TIADA REKOD BAYARAN */}
+                  {zeroPayers.length > 0 && (
+                    <div className="px-8 pt-8 pb-4">
+                       <h3 className="text-xs font-black text-rose-950 uppercase tracking-widest mb-4 flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse"></span>
+                          Tiada Rekod Bayaran ({zeroPayers.length})
+                       </h3>
+                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                          {zeroPayers.map(name => (
+                            <div key={name} className="flex flex-col bg-white border border-rose-200 p-3 rounded-2xl shadow-sm">
+                              <span className="text-[11px] font-black text-slate-900 uppercase truncate mb-1">{name}</span>
+                              <span className="text-[9px] font-bold text-rose-500 uppercase">TIADA REKOD</span>
+                            </div>
+                          ))}
+                       </div>
+                    </div>
+                  )}
+
+                  {/* BAHAGIAN 2: BAYARAN TELAH DIBUAT TETAPI BELUM SELESAI */}
+                  {partialPayers.length > 0 && (
+                    <div className="px-8 pt-4 pb-8">
+                       <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-orange-400"></span>
+                          Bayaran Telah Dibuat Tetapi Belum Selesai ({partialPayers.length})
+                       </h3>
+                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                          {partialPayers.map(name => {
+                            const docId = name.replace(/[^a-zA-Z0-9]/g, '_');
+                            const paidMonth = payments[docId]?.paidUntil || 0;
+                            return (
+                              <div key={name} className="flex flex-col bg-white border border-slate-200 p-3 rounded-2xl">
+                                <span className="text-[11px] font-bold text-slate-700 uppercase truncate mb-1">{name}</span>
+                                <span className="text-[9px] font-bold text-orange-500 uppercase">SEHINGGA: {MONTHS[paidMonth]}</span>
+                              </div>
+                            );
+                          })}
+                       </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -766,7 +747,7 @@ export default function App() {
                 />
               </div>
               <div className="flex bg-white p-2 border border-slate-200 rounded-[2rem] gap-1">
-                {['Semua', 'Telah Bayar', 'Belum Bayar'].map(f => (
+                {['Semua', 'Selesai Bayar', 'Belum Selesai'].map(f => (
                   <button key={f} onClick={() => setFilterStatus(f)} className={`px-6 py-3 rounded-2xl text-[10px] font-black tracking-widest transition-all ${filterStatus === f ? 'bg-indigo-600 text-white shadow-xl' : 'text-slate-500 hover:bg-slate-50'}`}>
                     {f.toUpperCase()}
                   </button>
@@ -790,18 +771,23 @@ export default function App() {
                     {filteredTeachers.map((name, idx) => {
                       const docId = name.replace(/[^a-zA-Z0-9]/g, '_');
                       const data = payments[docId] || { paidUntil: 0, lastDate: "", totalAmount: 0 };
+                      const isFull = data.paidUntil === MAX_PAYMENT_MONTH;
                       return (
                         <tr key={name} className="hover:bg-indigo-50/20 transition-all">
                           <td className="px-10 py-6">
                             <span className="text-sm font-bold text-slate-700">{idx + 1}. {name}</span>
                           </td>
                           <td className="px-6 py-6 text-center">
-                            {data.paidUntil > 0 ? (
-                              <span className={`px-5 py-2 rounded-full text-[9px] font-black tracking-widest ${data.paidUntil === 12 ? 'bg-indigo-600 text-white' : 'bg-emerald-100 text-emerald-700'}`}>
-                                HINGGA {MONTHS[data.paidUntil].toUpperCase()}
+                            {isFull ? (
+                              <span className="px-5 py-2 rounded-full text-[9px] font-black tracking-widest bg-indigo-600 text-white">
+                                SELESAI BAYARAN (PENUH)
+                              </span>
+                            ) : data.paidUntil > 0 ? (
+                              <span className="px-5 py-2 rounded-full text-[9px] font-black tracking-widest bg-emerald-100 text-emerald-700">
+                                HINGGA {MONTHS[data.paidUntil] ? MONTHS[data.paidUntil].toUpperCase() : ''}
                               </span>
                             ) : (
-                              <span className="px-5 py-2 rounded-full text-[9px] font-black tracking-widest bg-rose-50 text-rose-500">BELUM BAYAR</span>
+                              <span className="px-5 py-2 rounded-full text-[9px] font-black tracking-widest bg-rose-50 text-rose-500">TIADA REKOD</span>
                             )}
                           </td>
                           <td className="px-6 py-6 text-center font-black text-slate-800">RM {data.totalAmount || 0}</td>
@@ -822,14 +808,15 @@ export default function App() {
                 {filteredTeachers.map((name, idx) => {
                   const docId = name.replace(/[^a-zA-Z0-9]/g, '_');
                   const data = payments[docId] || { paidUntil: 0, lastDate: "", totalAmount: 0 };
+                  const isFull = data.paidUntil === MAX_PAYMENT_MONTH;
                   return (
                     <div key={name} className="p-6 active:bg-slate-50" onClick={() => isAdmin && openEdit(name)}>
                       <h3 className="text-sm font-black text-slate-800 mb-4">{idx + 1}. {name}</h3>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
                           <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Status</p>
-                          <span className={`text-[10px] font-black uppercase ${data.paidUntil > 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-                            {data.paidUntil > 0 ? MONTHS[data.paidUntil] : 'Belum Bayar'}
+                          <span className={`text-[10px] font-black uppercase ${isFull ? 'text-indigo-600' : (data.paidUntil > 0 ? 'text-emerald-600' : 'text-rose-500')}`}>
+                            {isFull ? 'SELESAI PENUH' : (data.paidUntil > 0 ? MONTHS[data.paidUntil] : 'TIADA REKOD')}
                           </span>
                         </div>
                         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
